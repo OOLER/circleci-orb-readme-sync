@@ -1,0 +1,28 @@
+version: 2.1
+description: "An orb for synchronizing documentation to ReadMe"
+commands:
+  setup:
+    description: |
+          Install and configure the ReadMe CLI. You will need to pass in a valid
+          ReadMe API token in order for this orb to work properly.
+    parameters:
+      api_token:
+        description: ReadMe API Token
+        type: string
+    steps:
+      - run: echo "ReadMe API Sync"
+executors:
+  cli_executor:
+    parameters:
+      version:
+        type: string
+        default: "2.4"
+    docker:
+      - image: circleci/node:lts
+jobs:
+  sync_docs:
+    executor: cli_executor
+    steps:
+      - setup
+          name: setup readme cli
+          api_token: foobarbaz
