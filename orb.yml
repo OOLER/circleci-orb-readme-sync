@@ -1,5 +1,7 @@
 version: 2.1
 description: "An orb for synchronizing documentation to ReadMe"
+display: 
+  source_url: https://github.com/OOLER/circleci-orb-readme-sync
 commands:
   install:
     description: Install the ReadMe CLI
@@ -136,6 +138,37 @@ jobs:
           project-version: << parameters.project-version >>
           readme-api-key: << parameters.readme-api-key >>
           readme-api-id: << parameters.readme-api-id >>
+examples:
+  sync-doc-folder:
+    description: Sync a directory containing ReadMe or GitHub friendly markdown.
+    usage:
+      version: 2.1
+      orbs:
+        readme-sync: kryoinc/readme-sync@x.y
+      jobs:
+        sync-docs: readme-sync/sync-docs
+      workflows:
+        version: 2
+        deploy_docs:
+          jobs:
+          - sync-docs:
+              readme-api-key: README_API_KEY
+  sync-spec-file:
+    description: Sync an OpenAPI or Swagger spec.
+    usage:
+      version: 2.1
+      orbs:
+        readme-sync: kryoinc/readme-sync@x.y
+      jobs:
+        sync-spec: readme-sync/sync-spec
+      workflows:
+        version: 2
+        deploy_docs:
+          jobs:
+          - sync-spec:
+              readme-api-key: README_API_KEY
+              readme-api-id: <your readme api id>
+              path: path/to/some/spec.{json,yaml}
 executors:
   default:
       docker:
