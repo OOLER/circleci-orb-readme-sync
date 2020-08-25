@@ -1,28 +1,142 @@
 version: 2.1
 description: "An orb for synchronizing documentation to ReadMe"
 commands:
-  setup:
-    description: |
-          Install and configure the ReadMe CLI. You will need to pass in a valid
-          ReadMe API token in order for this orb to work properly.
+  install:
+    description: Install the ReadMe CLI
     parameters:
-      api_token:
-        description: ReadMe API Token
+      cli-version:
         type: string
     steps:
-      - run: echo "ReadMe API Sync"
-executors:
-  cli_executor:
+      - run: 
+          name: Installing ReadMe version "<< parameters.cli-version >>" from NPM
+          command: |
+            sudo npm install -g rdme@<< parameters.cli-version >>
+            rdme -v
+  sync-docs:
+    description: Sync Markdown docs in the specified directory to ReadMe
     parameters:
-      version:
+      cli-version:
         type: string
-        default: "2.4"
-    docker:
-      - image: circleci/node:lts
+      readme-api-key: 
+        type: string
+      project-version: 
+        type: string
+      path:
+        type: string
+      recursive: 
+        type: boolean
+    steps:
+      - install:
+          cli-version: << parameters.cli-version >>
+      - run: 
+          name: Syncing docs to ReadMe
+          command: |
+            sync_docs()
+            {
+              rdme docs $1 --version=<< parameters.project-version >> --key=${<< parameters.readme-api-key >>}
+            }
+            
+            target_path=$(pwd)/<< parameters.path >>
+
+            echo "Syncing documents in directory $target_path (recursive = << parameters.recursive >>)"
+
+            if [ << parameters.recursive >> = true ]; then
+              # Get all folders that contain .md files and remove duplicates
+              for path in $(find "$target_path" -type f -name '*.md*' -printf '%h\n' | sort -u); do
+                sync_docs $path
+              done
+            else
+              sync_docs $target_path
+            fi
+  sync-spec:
+    description: Sync API spec at the specified location to ReadMe
+    parameters:
+      cli-version:
+        type: string
+      readme-api-key: 
+        type: string
+      readme-api-id: 
+        type: string
+      project-version: 
+        type: string
+      path:
+        type: string
+    steps:
+      - install:
+          cli-version: << parameters.cli-version >>
+      - run: 
+          name: Syncing spec to ReadMe
+          command: |
+            sync_spec()
+            {
+              rdme swagger ./$1 --version=<< parameters.project-version >> --id=<< parameters.readme-api-id>> --key=${<< parameters.readme-api-key >>}
+            }
+
+            echo "Syncing API spec at target path: << parameters.path >>"
+
+            sync_spec << parameters.path >>
 jobs:
-  sync_docs:
-    executor: cli_executor
+  sync-docs:
+    description: Sync docs to our ReadMe project
+    executor: default
+    parameters:
+      project-version:
+        type: string
+        default: "1.0"
+        description: The version of your project on ReadMe that you wish to sync your docs to.
+      cli-version:
+        type: string
+        default: latest
+        description: The version of the ReadMe CLI that you wish to install.
+      readme-api-key:
+        type: string
+        description: Your ReadMe project API key
+      recursive:
+        type: boolean
+        default: true
+        description: If set to true, descendant directories of the supplied path will also be synced.
+      path:
+        type: string
+        default: docs
+        description: The path to one or more docs to sync
     steps:
-      - setup
-          name: setup readme cli
-          api_token: foobarbaz
+      - checkout
+      - sync-docs:
+          path: << parameters.path >>
+          cli-version: << parameters.cli-version >>
+          project-version: << parameters.project-version >>
+          readme-api-key: << parameters.readme-api-key >>
+          recursive: << parameters.recursive >>
+  sync-spec:
+    description: Sync ReadMe API spec
+    executor: default
+    parameters:
+      project-version:
+        type: string
+        default: "1.0"
+        description: The version of your project on ReadMe that you wish to sync your docs to.
+      cli-version:
+        type: string
+        default: latest
+        description: The version of the ReadMe CLI that you wish to install.
+      readme-api-key:
+        type: string
+        description: Your ReadMe project API key
+      readme-api-id:
+        type: string
+        description: The ReadMe API ID for syncing the spec(s) to.
+      path:
+        type: string
+        description: The path to the API spec you wish to sync
+    steps:
+      - checkout
+      - sync-spec:
+          path: << parameters.path >>
+          cli-version: << parameters.cli-version >>
+          project-version: << parameters.project-version >>
+          readme-api-key: << parameters.readme-api-key >>
+          readme-api-id: << parameters.readme-api-id >>
+executors:
+  default:
+      docker:
+      - image: circleci/node:lts
