@@ -2,6 +2,8 @@ version: 2.1
 description: "An orb for synchronizing documentation to ReadMe"
 display: 
   source_url: https://github.com/OOLER/circleci-orb-readme-sync
+orbs:
+  jq: circleci/jq@2.2.0
 commands:
   install:
     description: Install the ReadMe CLI
@@ -25,31 +27,114 @@ commands:
         type: string
       path:
         type: string
-      recursive: 
-        type: boolean
     steps:
       - install:
           cli-version: << parameters.cli-version >>
       - run: 
           name: Syncing docs to ReadMe
           command: |
+
+            # Write new metadata tags to file
+            #
+            # $1 the markdown file
+            # $2 parent id
+            write_metadata()
+            {
+              # Get currently defined metadata fields
+              fields=$(sed -n '/---/,/---/{/---/!{/---/!p}}' $1)
+              title=$(grep "title" \<<< $fields | cut -d ":" -f2 | xargs)
+              category=$(grep "category" \<<< $fields | cut -d ":" -f2 | xargs)
+
+              # Remove the existing metadata fields from file
+              sed -i '/---/,/---/d' $1
+              
+              # Create a new file with new metadata header and existing doc content
+              echo '---' > "$1.header"
+              echo "title: $title" >> "$1.header"
+              echo "category: $category" >> "$1.header"
+              if [ -n "$2" ]; then
+                echo "parentDoc: $2" >> "$1.header"
+              fi
+              echo '---' >> "$1.header"
+
+              # Overwrite the existing file with the new metadata
+              cat $1 >> "$1.header"
+              cp "$1.header" $1
+            }
+
+
+            # Syncs a folder of docs using the ReadMe CLI
+            # 
+            # $1 target directory
+            # $2 parent id
             sync_docs()
             {
-              rdme docs $1 --version=<< parameters.project-version >> --key=${<< parameters.readme-api-key >>}
+              # Only try to sync if there are markdown files present, otherwise the CLI throws an error
+              md_count=$(find "$1" -maxdepth 1 -type f -name '*.md'  | wc -l)                 
+              
+              if [ $md_count != 0 ]; then
+                # Insert IDs into each markdown doc in this directory
+                for file in $1/*.md; do
+                  dir=$(dirname "$file")
+
+                  [ -f "$dir/parentId" ] && parent=$(cat "$dir/parentId")
+
+                  write_metadata "$file" $parent
+
+                  unset parent # unset to avoid using previous values
+                done
+
+                rdme docs $1 --version=<< parameters.project-version >> --key=${<< parameters.readme-api-key >>} > /dev/null
+              
+              else 
+                echo "No markdown files found in directory: $1"
+              fi
             }
             
             target_path=$(pwd)/<< parameters.path >>
 
-            echo "Syncing documents in directory $target_path (recursive = << parameters.recursive >>)"
+            for file in $(find "$target_path" -type d); do
+              # Check for any parent/child doc relationships
+              current_dir=${file##*/}
+            
+              # Get the parent directory of the current directory to check it for our parent-child condition
+              parent_dir="$(dirname "$file")"
 
-            if [ << parameters.recursive >> = true ]; then
-              # Get all folders that contain .md files and remove duplicates
-              for path in $(find "$target_path" -type f -name '*.md*' -printf '%h\n' | sort -u); do
-                sync_docs $path
+
+              # Check parent directory to see if there is a parent/child relationship present.
+              # A parent-child relationship is defined as a markdown file having a folder with the 
+              # same name adjacent to it in a directory. For example:
+              # 
+              # some_dir/
+              #     my_parent.md
+              #          my_parent/
+              #              child_doc_1.md
+              #              child_doc_2.md
+              for child_dir in $(find "$file" -mindepth 1 -maxdepth 1 -type d | sort -u); do
+                parent_child_rel=$(find "$file" -maxdepth 1 -type f -name "${child_dir##*/}.md")
+                if [ -n "$parent_child_rel" ]; then
+                  
+                  # Get the parent doc's ID
+                  parent_lookup=$(curl -s --request GET \
+                    --url https://dash.readme.io/api/v1/docs/${child_dir##*/} \
+                    --header "authorization: Basic ${<< parameters.readme-api-key >>}"
+                  )
+                  
+                  error=$(echo "$parent_lookup" | jq -r '.error')
+
+                  if [ -z "$error" ] || [ "$error" = "null" ]; then
+                    parent_id=$(echo "$parent_lookup" | jq -r '.id')
+                    echo $parent_id > ${file}/${child_dir##*/}/parentId
+                  else
+                    echo "Error: $error"
+                  fi
+                fi
               done
-            else
-              sync_docs $target_path
-            fi
+
+              echo "Syncing docs: $file"
+
+              sync_docs $file
+            done
   sync-spec:
     description: Sync API spec at the specified location to ReadMe
     parameters:
@@ -69,14 +154,32 @@ commands:
       - run: 
           name: Syncing spec to ReadMe
           command: |
+
+            # Sync the spec to ReadMe
+            #
+            # $1 The path to the spec
+            # $2 the API ID
             sync_spec()
             {
-              rdme swagger ./$1 --version=<< parameters.project-version >> --id=<< parameters.readme-api-id>> --key=${<< parameters.readme-api-key >>}
+              rdme swagger ./$1 --version=<< parameters.project-version >> --id=$2 --key=${<< parameters.readme-api-key >>}
             }
+
+            # Get our API ID from either the job param or an id file
+            parent_dir=$(dirname "<< parameters.path >>")
+            
+            [ -n "<< parameters.readme-api-id>>" ] && id=${<< parameters.readme-api-id >>} || id=$(cat "${parent_dir}/id")
+
+            if [ -z "$id" ]; then
+              echo "Error: no ReadMe API ID found. Make sure it is passed in to the job via the parameter 'readme-api-id', or create a file next" \
+                "to the spec named 'id' that contains the API ID"
+              exit 1
+            fi
 
             echo "Syncing API spec at target path: << parameters.path >>"
 
-            sync_spec << parameters.path >>
+            sync_spec << parameters.path >> $id
+
+            # Check for any child docs living with the API spec
 jobs:
   sync-docs:
     description: Sync docs to our ReadMe project
@@ -93,10 +196,6 @@ jobs:
       readme-api-key:
         type: string
         description: Your ReadMe project API key
-      recursive:
-        type: boolean
-        default: true
-        description: If set to true, descendant directories of the supplied path will also be synced.
       path:
         type: string
         default: docs
@@ -108,7 +207,6 @@ jobs:
           cli-version: << parameters.cli-version >>
           project-version: << parameters.project-version >>
           readme-api-key: << parameters.readme-api-key >>
-          recursive: << parameters.recursive >>
   sync-spec:
     description: Sync ReadMe API spec
     executor: default
@@ -126,6 +224,7 @@ jobs:
         description: Your ReadMe project API key
       readme-api-id:
         type: string
+        default: ''
         description: The ReadMe API ID for syncing the spec(s) to.
       path:
         type: string
@@ -138,6 +237,12 @@ jobs:
           project-version: << parameters.project-version >>
           readme-api-key: << parameters.readme-api-key >>
           readme-api-id: << parameters.readme-api-id >>
+
+executors:
+  default:
+      docker:
+      - image: circleci/node:lts
+
 examples:
   sync-doc-folder:
     description: Sync a directory containing ReadMe or GitHub friendly markdown.
@@ -169,7 +274,3 @@ examples:
               readme-api-key: README_API_KEY
               readme-api-id: <your readme api id>
               path: path/to/some/spec.{json,yaml}
-executors:
-  default:
-      docker:
-      - image: circleci/node:lts
