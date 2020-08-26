@@ -95,4 +95,12 @@ my-api/
 ```
 
 Note that these docs should be named to match the correct slug of the API resource in ReadMe. They should also contain the proper
-metadata header as described [here](#add-the-proper-document-metadata)
+metadata header as described [here](#add-the-proper-document-metadata). The category ID for the API can be had via the [category API](https://docs.readme.com/developers/reference/categories).
+
+## Deleting documents
+
+This orb does not currently support this feature, since the ReadMe CLI does not also support it. However, docs can be deleted via either the ReadMe dashboard or their REST API.
+
+## Contributing
+
+Feel free to file an issue or make any pull requests! We will get back to you as soon as possible.
