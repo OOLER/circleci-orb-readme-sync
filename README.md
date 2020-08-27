@@ -55,8 +55,7 @@ my-docs/
       child-doc.md
 ```
 
-This allows for the parent to be synced first, and then have its ID retrieved to be used to create the parent-child connection
-with the child document subfolder.
+This allows for the parent to be synced first, and then have its ID retrieved to be used to create the parent-child connection all in one go. This way, you can create a parent and its children all in one commit.
 
 __Note:__ ReadMe only nests up to two levels deep:
 
