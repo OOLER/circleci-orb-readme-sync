@@ -105,7 +105,7 @@ __Note:__ These docs should be named to match the correct slug of the API resour
 
 ## API Naming Conventions
 
-The following is a brief summary that paraphrases much ReadMe's [own documentation](https://docs.readme.com/guides/docs/openapi).
+The following is a brief summary that paraphrases much of ReadMe's [own documentation](https://docs.readme.com/guides/docs/openapi).
 
 ### API Page Titles
 
