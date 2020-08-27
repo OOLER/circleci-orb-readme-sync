@@ -258,6 +258,7 @@ examples:
           jobs:
           - sync-docs:
               readme-api-key: README_API_KEY
+              path: path/to/your/docs
   sync-spec-file:
     description: Sync an OpenAPI or Swagger spec.
     usage:
