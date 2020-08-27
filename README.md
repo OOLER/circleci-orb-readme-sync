@@ -58,6 +58,12 @@ my-docs/
 This allows for the parent to be synced first, and then have its ID retrieved to be used to create the parent-child connection
 with the child document subfolder.
 
+__Note:__ ReadMe only nests up to two levels deep:
+
+```Category -> Parent Doc -> Child Doc```
+
+This also applies to deeply nested API resources.
+
 ## Working with API Specs
 
 A job is available to sync an API spec: `sync-spec`.
@@ -97,7 +103,6 @@ my-api/
 __Note:__ This folder structure isn't necessarily required, but mirrors the way that documents are organized on ReadMe.
 
 __Note:__ These docs should be named to match the correct slug of the API resource in ReadMe. The way these slugs are determined is covered in the next sections.
-
 
 ## API Naming Conventions
 
@@ -161,7 +166,7 @@ Additional path items are added to the end, separated by dashes:
 
 ```get_devices-model-serial-number-tests```
 
-This would require a filename of `get_devices-model-serial-number-tests.md`. This can quickly get out of hand, so it is preferable that you specify an `operationId` to keep things simple. The folder structure for a nested relationship would stil stay relatively flat:
+This would require a filename of `get_devices-model-serial-number-tests.md`. This can quickly get out of hand, so it is preferable that you specify an `operationId` to keep things simple. The folder structure for a nested relationship would still stay relatively flat:
 
 ```
 device-api/
