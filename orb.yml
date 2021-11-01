@@ -167,7 +167,7 @@ commands:
             # Get our API ID from either the job param or an id file
             parent_dir=$(dirname "<< parameters.path >>")
             
-            [ -n "<< parameters.readme-api-id>>" ] && id=${<< parameters.readme-api-id >>} || id=$(cat "${parent_dir}/id")
+            [ -n "<< parameters.readme-api-id>>" ] && id="<< parameters.readme-api-id >>" || id=$(cat "${parent_dir}/id")
 
             if [ -z "$id" ]; then
               echo "Error: no ReadMe API ID found. Make sure it is passed in to the job via the parameter 'readme-api-id', or create a file next" \
